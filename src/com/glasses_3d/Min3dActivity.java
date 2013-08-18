@@ -55,10 +55,10 @@ public class Min3dActivity extends RendererActivity implements CvCameraViewListe
 		scene.backgroundColor().setAll(0x00000000);
 				
 		scene.lights().add(new Light());
-		scene.lights().add(new Light());
-		Light myLight = new Light();    
-		myLight.position.setZ(150); 
-		scene.lights().add(myLight);
+		//scene.lights().add(new Light());
+		//Light myLight = new Light();    
+		//myLight.position.setZ(150); 
+		//scene.lights().add(myLight);
 		
 		//IParser parser = Parser.createParser(Parser.Type.OBJ,
 		//		getResources(), "com.glasses_3d:raw/face_obj", true);
@@ -84,6 +84,7 @@ public class Min3dActivity extends RendererActivity implements CvCameraViewListe
 	    _glSurfaceView.getHolder().setFormat( PixelFormat.TRANSLUCENT );
     }
 	
+	//------- Mixing OpenCV CameraView and Min3D View together --------------------------------------------
 	@Override
 	protected void onCreateSetContentView()
 	{
@@ -136,9 +137,9 @@ public class Min3dActivity extends RendererActivity implements CvCameraViewListe
 	@Override
     public Mat onCameraFrame(CvCameraViewFrame inputFrame) {
 
-        mRgba = inputFrame.rgba();
-        mGray = inputFrame.gray();
-
+		Core.flip( inputFrame.rgba(), mRgba, 1 );
+		Core.flip( inputFrame.gray(), mGray, 1 );
+		
         if (mAbsoluteFaceSize == 0) {
             int height = mGray.rows();
             if (Math.round(height * mRelativeFaceSize) > 0) {
@@ -158,7 +159,7 @@ public class Min3dActivity extends RendererActivity implements CvCameraViewListe
         for (int i = 0; i < facesArray.length; i++)
         {
             Core.rectangle(mRgba, facesArray[i].tl(), facesArray[i].br(), FACE_RECT_COLOR, 3);
-            
+                        
             //glRenderer.setHeadPosition( 
             //		new android.graphics.Point(facesArray[0].x + facesArray[0].width/2, facesArray[0].y + facesArray[0].height/2) );
         }
