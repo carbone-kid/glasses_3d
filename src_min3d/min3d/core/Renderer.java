@@ -37,6 +37,9 @@ public class Renderer implements GLSurfaceView.Renderer
 	private FloatBuffer _scratchFloatBuffer;
 	private boolean _scratchB;
 	
+	private int[] viewport = new int[4];  
+    private float[] modelview = new float[16];  
+    private float[] projection = new float[16];  
 
 	// stats-related
 	public static final int FRAMERATE_SAMPLEINTERVAL_MS = 1000; 
@@ -128,6 +131,21 @@ public class Renderer implements GLSurfaceView.Renderer
 		return _memoryInfo.availMem;
 	}
 	
+	public float[] ScreenTo3D( float x, float y )
+	{
+		float[] obj = new float[4];
+		int retval = GLU.gluUnProject( x, y, -_scene.camera().position.z, 
+    			modelview, 0, projection, 0, viewport, 0, obj, 0 );
+		
+		if(retval == GL10.GL_TRUE)
+		{
+			obj[0] *= obj[3];
+			obj[1] *= obj[3];
+			obj[2] *= obj[3];
+		}
+		return obj;
+	}
+	
 	protected void drawSetup()
 	{
 		// View frustrum
@@ -145,6 +163,13 @@ public class Renderer implements GLSurfaceView.Renderer
 			_scene.camera().position.x,_scene.camera().position.y,_scene.camera().position.z,
 			_scene.camera().target.x,_scene.camera().target.y,_scene.camera().target.z,
 			_scene.camera().upAxis.x,_scene.camera().upAxis.y,_scene.camera().upAxis.z);
+		
+		if (_gl instanceof GL11)
+        {
+        	((GL11) _gl).glGetIntegerv(GL11.GL_VIEWPORT, viewport, 0);
+        	((GL11) _gl).glGetFloatv(GL11.GL_MODELVIEW_MATRIX, modelview, 0);
+        	((GL11) _gl).glGetFloatv(GL11.GL_PROJECTION_MATRIX, projection, 0);
+        }
 		
 		// Background color
 		

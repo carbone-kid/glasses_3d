@@ -7,6 +7,7 @@ import java.io.InputStream;
 
 import org.opencv.android.CameraBridgeViewBase.CvCameraViewListener2;
 
+import min3d.Shared;
 import min3d.core.Object3dContainer;
 import min3d.core.RendererActivity;
 import min3d.parser.IParser;
@@ -42,14 +43,8 @@ import org.opencv.objdetect.CascadeClassifier;
 
 public class Min3dActivity extends RendererActivity implements CvCameraViewListener2
 {   
-	private Object3dContainer object3DGlasses;
-	private Object3dContainer object3DHead;
-	private min3d.vos.Number3d objectPosition = new min3d.vos.Number3d();
-	
-	GL10 gl;
-	private int[] viewport = new int[4];  
-    private float[] modelview = new float[16];  
-    private float[] projection = new float[16];  
+	private Object3dContainer mObject3DGlasses;
+	private min3d.vos.Number3d mGlassesPosition = new min3d.vos.Number3d();
 	
 	private static final Scalar FACE_RECT_COLOR = new Scalar(0, 255, 0, 255);
 	private Mat mRgba;
@@ -59,22 +54,15 @@ public class Min3dActivity extends RendererActivity implements CvCameraViewListe
     private CascadeClassifier mJavaDetector;
     private File mCascadeFile;
     private CameraBridgeViewBase mOpenCvCameraView;
-    private float height;
-    private float width;
+    private float mPreviewShiftFromLeft;
+    private float mPreviewShiftFromTop;
+    private float mFrameWidth;
+    private float mFrameHeight;
 	
   //------- Min3D part --------------------------------------------
 	@Override
 	public void initScene() {
-		
-		// this is obviously not the best way to convert screen to scene coordinates  
-		gl = min3d.Shared.renderer().gl();
-		if (gl instanceof GL11)
-        {
-        	((GL11) gl).glGetIntegerv(GL11.GL_VIEWPORT, viewport, 0);
-        	((GL11) gl).glGetFloatv(GL11.GL_MODELVIEW_MATRIX, modelview, 0);
-        	((GL11) gl).glGetFloatv(GL11.GL_PROJECTION_MATRIX, projection, 0);
-        }
-		
+
 		// it is necessary to see the camera preview on the background
 		scene.backgroundColor().setAll(0x00000000);
 		
@@ -90,29 +78,17 @@ public class Min3dActivity extends RendererActivity implements CvCameraViewListe
 				getResources(), "com.glasses_3d:raw/glasses_obj", true);
 		parser.parse();
 
-		object3DGlasses = parser.getParsedObject();
-		object3DGlasses.scale().x = object3DGlasses.scale().y = object3DGlasses.scale().z = 0.3f;
-		object3DGlasses.rotation().y = 180;
-		scene.addChild(object3DGlasses);
-
-		// adding another object
-		IParser parserHeadObj = Parser.createParser(Parser.Type.OBJ,
-				getResources(), "com.glasses_3d:raw/face_obj", true);
-		parserHeadObj.parse();
-
-		object3DHead = parserHeadObj.getParsedObject();
-		object3DHead.scale().x = object3DHead.scale().y = object3DHead.scale().z = 0.004f;
-		scene.addChild(object3DHead);
-		object3DHead.position().x = -1;
-		object3DHead.position().y = -1;
+		mObject3DGlasses = parser.getParsedObject();
+		mObject3DGlasses.scale().x = mObject3DGlasses.scale().y = mObject3DGlasses.scale().z = 0.3f;
+		mObject3DGlasses.rotation().y = 180;
+		scene.addChild(mObject3DGlasses);
 	}
 
 	@Override
 	public void updateScene() {
-		object3DGlasses.position().x = objectPosition.x;
-		object3DGlasses.position().y = objectPosition.y;
-		
-		object3DHead.rotation().y += 1.0f;
+		mObject3DGlasses.position().x = mGlassesPosition.x;
+		mObject3DGlasses.position().y = mGlassesPosition.y;
+		mObject3DGlasses.position().z = -1;
 	}
 	
 	@Override
@@ -165,6 +141,11 @@ public class Min3dActivity extends RendererActivity implements CvCameraViewListe
 	public void onCameraViewStarted(int width, int height) {
         mGray = new Mat();
         mRgba = new Mat();
+        
+        mFrameWidth = width;
+        mFrameHeight = height;
+        mPreviewShiftFromLeft = (mOpenCvCameraView.getWidth() - width) /2;
+        mPreviewShiftFromTop = (mOpenCvCameraView.getHeight() - height) /2;
     }
 
 	@Override
@@ -175,7 +156,7 @@ public class Min3dActivity extends RendererActivity implements CvCameraViewListe
 
 	@Override
     public Mat onCameraFrame(CvCameraViewFrame inputFrame) {
-
+		
 		Core.flip( inputFrame.rgba(), mRgba, 1 );
 		Core.flip( inputFrame.gray(), mGray, 1 );
 		
@@ -194,9 +175,6 @@ public class Min3dActivity extends RendererActivity implements CvCameraViewListe
             		new Size(mAbsoluteFaceSize, mAbsoluteFaceSize), new Size());
         }
         
-        height = mOpenCvCameraView.getHeight();
-        width = mOpenCvCameraView.getWidth();
-            
         Rect[] facesArray = faces.toArray();
         for (int i = 0; i < facesArray.length; i++)
         {
@@ -205,12 +183,13 @@ public class Min3dActivity extends RendererActivity implements CvCameraViewListe
         
         if( facesArray.length > 0 )
         {
-        	float[] obj = new float[4];
-        	GLU.gluUnProject( facesArray[0].x + facesArray[0].width, 
-        			facesArray[0].y + facesArray[0].height/3, 
-        			100.0f, modelview, 0, projection, 0, viewport, 0, obj, 0 );
-            objectPosition.x = obj[0]; 
-            objectPosition.y = -obj[1];
+        	float[] objPosition = new float[4];
+
+        	objPosition = Shared.renderer().ScreenTo3D(mPreviewShiftFromLeft + facesArray[0].x + facesArray[0].width/2, 
+        			mPreviewShiftFromTop + facesArray[0].y + facesArray[0].height/3);
+            
+        	mGlassesPosition.x = objPosition[0]; 
+            mGlassesPosition.y = -objPosition[1];
         }
         
         return mRgba;
