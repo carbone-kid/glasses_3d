@@ -618,7 +618,8 @@ public class Renderer implements GLSurfaceView.Renderer
 		
 		_gl.glMatrixMode(GL10.GL_PROJECTION);
 		_gl.glLoadIdentity();
-		_gl.glFrustumf(lt,rt, btm,top, vf.zNear(), vf.zFar());
+		//_gl.glFrustumf(lt,rt, btm,top, vf.zNear(), vf.zFar());
+		_gl.glOrthof(lt,rt, btm,top, vf.zNear(), vf.zFar()); 
 		
 		vf.clearDirtyFlag();
 	}

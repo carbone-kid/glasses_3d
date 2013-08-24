@@ -48,6 +48,8 @@ containing a value of this type.
     }
     public static final class drawable {
         public static final int ic_launcher=0x7f020000;
+        public static final int rayban=0x7f020001;
+        public static final int rayban_bump=0x7f020002;
     }
     public static final class id {
         public static final int action_settings=0x7f050004;
@@ -63,10 +65,10 @@ containing a value of this type.
         public static final int main=0x7f090000;
     }
     public static final class raw {
-        public static final int glasses_mtl=0x7f040000;
-        public static final int glasses_obj=0x7f040001;
-        public static final int haarcascade_frontalface_default=0x7f040002;
-        public static final int haarcascade_mcs_eyepair_big=0x7f040003;
+        public static final int haarcascade_frontalface_default=0x7f040000;
+        public static final int haarcascade_mcs_eyepair_big=0x7f040001;
+        public static final int rayban_mtl=0x7f040002;
+        public static final int rayban_obj=0x7f040003;
     }
     public static final class string {
         public static final int action_settings=0x7f070001;

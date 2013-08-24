@@ -31,7 +31,6 @@ import org.opencv.core.Rect;
 import org.opencv.core.Scalar;
 import org.opencv.core.Size;
 import org.opencv.android.CameraBridgeViewBase;
-//import org.opencv.android.CameraBridgeViewBase.CvCameraViewListener2;
 import org.opencv.objdetect.CascadeClassifier;
 
 
@@ -61,7 +60,7 @@ public class Min3dActivity extends RendererActivity implements CvCameraViewListe
     //------- Min3D part --------------------------------------------
 	@Override
 	public void initScene() {
-
+		
 		// it is necessary to see the camera preview on the background
 		scene.backgroundColor().setAll(0x00000000);
 		
@@ -74,21 +73,21 @@ public class Min3dActivity extends RendererActivity implements CvCameraViewListe
 		
 		// adding 3d glasses
 		IParser parser = Parser.createParser(Parser.Type.OBJ,
-				getResources(), "com.glasses_3d:raw/glasses_obj", true);
+				getResources(), "com.glasses_3d:raw/rayban_obj", true);
 		parser.parse();
 
 		mObject3DGlasses = parser.getParsedObject();
-		mObject3DGlasses.scale().x = mObject3DGlasses.scale().y = mObject3DGlasses.scale().z = 0.3f;
-		mObject3DGlasses.rotation().y = 180;
 		scene.addChild(mObject3DGlasses);
 	}
 
 	@Override
 	public void updateScene() {
+		mObject3DGlasses.rotation().x = -7;
 		mObject3DGlasses.position().x = mGlassesPosition.x;
-		mObject3DGlasses.position().y = mGlassesPosition.y;
+		float MESH_SHIFT_Y = 0.04f; // The center point of the specific mesh I'm using is not in the right place, so we have to move it 
+		mObject3DGlasses.position().y = mGlassesPosition.y - MESH_SHIFT_Y;
 		mObject3DGlasses.position().z = -1;
-		mObject3DGlasses.scale().x = mObject3DGlasses.scale().y = mObject3DGlasses.scale().z = 1.6f * mGlassesScaleFactor;
+		mObject3DGlasses.scale().x = mObject3DGlasses.scale().y = mObject3DGlasses.scale().z = 0.063f * mGlassesScaleFactor;
 	}
 	
 	@Override
