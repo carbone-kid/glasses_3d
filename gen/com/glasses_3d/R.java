@@ -65,7 +65,8 @@ containing a value of this type.
     public static final class raw {
         public static final int glasses_mtl=0x7f040000;
         public static final int glasses_obj=0x7f040001;
-        public static final int lbpcascade_frontalface=0x7f040002;
+        public static final int haarcascade_frontalface_default=0x7f040002;
+        public static final int haarcascade_mcs_eyepair_big=0x7f040003;
     }
     public static final class string {
         public static final int action_settings=0x7f070001;

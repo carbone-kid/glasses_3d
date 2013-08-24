@@ -14,15 +14,8 @@ import min3d.parser.IParser;
 import min3d.parser.Parser;
 import min3d.vos.Light;
 
-import javax.microedition.khronos.egl.EGLConfig;
-import javax.microedition.khronos.opengles.GL10;
-import javax.microedition.khronos.opengles.GL11;
-
 import android.content.Context;
 import android.graphics.PixelFormat;
-import android.opengl.GLU;
-import android.os.Bundle;
-import android.util.Log;
 import android.view.WindowManager;
 import android.view.ViewGroup.LayoutParams;
 
@@ -33,33 +26,39 @@ import org.opencv.android.OpenCVLoader;
 import org.opencv.core.Core;
 import org.opencv.core.Mat;
 import org.opencv.core.MatOfRect;
+import org.opencv.core.Point;
 import org.opencv.core.Rect;
 import org.opencv.core.Scalar;
 import org.opencv.core.Size;
 import org.opencv.android.CameraBridgeViewBase;
-import org.opencv.android.CameraBridgeViewBase.CvCameraViewListener2;
+//import org.opencv.android.CameraBridgeViewBase.CvCameraViewListener2;
 import org.opencv.objdetect.CascadeClassifier;
 
 
 public class Min3dActivity extends RendererActivity implements CvCameraViewListener2
 {   
 	private Object3dContainer mObject3DGlasses;
-	private min3d.vos.Number3d mGlassesPosition = new min3d.vos.Number3d();
+	private min3d.vos.Number3d mGlassesPosition = new min3d.vos.Number3d( 100.0f, 100.0f, 0.0f ); // Move the object out of visibility
+	Point mPositionBetweenEyesOnPreview = new Point();
+	float mGlassesScaleFactor = 1;
 	
-	private static final Scalar FACE_RECT_COLOR = new Scalar(0, 255, 0, 255);
+	private static final Scalar GOOD_NEWS_COLOUR = new Scalar(0, 255, 0, 255);
+	private static final Scalar BAD_NEWS_COLOUR = new Scalar(255, 255, 0, 255);
 	private Mat mRgba;
     private Mat mGray;
     private float mRelativeFaceSize = 0.2f;
     private int   mAbsoluteFaceSize = 0;
-    private CascadeClassifier mJavaDetector;
-    private File mCascadeFile;
+    private CascadeClassifier mFaceDetector;
+    private File mCascadeFaceFile;
+    private CascadeClassifier mEyesDetector;
+    private File mCascadeEyesFile;
     private CameraBridgeViewBase mOpenCvCameraView;
-    private float mPreviewShiftFromLeft;
-    private float mPreviewShiftFromTop;
-    private float mFrameWidth;
-    private float mFrameHeight;
+    private int mPreviewShiftFromLeft;
+    private int mPreviewShiftFromTop;
+    private int mPreviewWidth;
+    private int mPreviewHeight;
 	
-  //------- Min3D part --------------------------------------------
+    //------- Min3D part --------------------------------------------
 	@Override
 	public void initScene() {
 
@@ -89,6 +88,7 @@ public class Min3dActivity extends RendererActivity implements CvCameraViewListe
 		mObject3DGlasses.position().x = mGlassesPosition.x;
 		mObject3DGlasses.position().y = mGlassesPosition.y;
 		mObject3DGlasses.position().z = -1;
+		mObject3DGlasses.scale().x = mObject3DGlasses.scale().y = mObject3DGlasses.scale().z = 1.6f * mGlassesScaleFactor;
 	}
 	
 	@Override
@@ -142,10 +142,10 @@ public class Min3dActivity extends RendererActivity implements CvCameraViewListe
         mGray = new Mat();
         mRgba = new Mat();
         
-        mFrameWidth = width;
-        mFrameHeight = height;
-        mPreviewShiftFromLeft = (mOpenCvCameraView.getWidth() - width) /2;
-        mPreviewShiftFromTop = (mOpenCvCameraView.getHeight() - height) /2;
+        mPreviewWidth = width;
+        mPreviewHeight = height;
+        mPreviewShiftFromLeft = (mOpenCvCameraView.getWidth() - width) / 2;
+        mPreviewShiftFromTop = (mOpenCvCameraView.getHeight() - height) / 2;
     }
 
 	@Override
@@ -167,30 +167,65 @@ public class Min3dActivity extends RendererActivity implements CvCameraViewListe
             }
         }
 
+        // Searching for Faces
         MatOfRect faces = new MatOfRect();
-
-        if (mJavaDetector != null)
+        if (mFaceDetector != null)
         {
-            mJavaDetector.detectMultiScale(mGray, faces, 1.1, 2, 2, 
+            mFaceDetector.detectMultiScale(mGray, faces, 1.1, 2, 2, 
             		new Size(mAbsoluteFaceSize, mAbsoluteFaceSize), new Size());
         }
         
         Rect[] facesArray = faces.toArray();
         for (int i = 0; i < facesArray.length; i++)
         {
-            Core.rectangle(mRgba, facesArray[i].tl(), facesArray[i].br(), FACE_RECT_COLOR, 3);
+        	// Searching for Eyes
+        	MatOfRect eyes = new MatOfRect();
+        	if (mEyesDetector != null)
+            {
+        		mEyesDetector.detectMultiScale(mGray.submat(facesArray[i]), eyes, 1.1, 2, 2, 
+                		new Size(mAbsoluteFaceSize, mAbsoluteFaceSize/3), new Size());
+            }
+        	
+        	// Store eyes position
+        	Rect[] eyesArray = eyes.toArray();
+        	if( eyesArray.length == 1 )
+            {
+            	Point tl = new Point( facesArray[i].x + eyesArray[0].x, 
+            			facesArray[i].y + eyesArray[0].y );
+            	
+            	Point br = new Point( facesArray[i].x + eyesArray[0].x + eyesArray[0].width, 
+            			facesArray[i].y + eyesArray[0].y + eyesArray[0].height );
+            	
+            	mPositionBetweenEyesOnPreview.x = tl.x + eyesArray[0].width/2;
+            	mPositionBetweenEyesOnPreview.y = tl.y + eyesArray[0].height/2;
+            	mGlassesScaleFactor = (float) eyesArray[0].width / (float) mPreviewWidth;
+
+            	//--
+            	float[] objPosition = new float[4];
+
+            	objPosition = Shared.renderer().ScreenTo3D(mPreviewShiftFromLeft + (int)mPositionBetweenEyesOnPreview.x, 
+            			mPreviewShiftFromTop + (int)mPositionBetweenEyesOnPreview.y);
+                
+            	mGlassesPosition.x = objPosition[0]; 
+                mGlassesPosition.y = -objPosition[1];
+                
+                //--
+                //Core.rectangle(mRgba, tl, br, EYES_RECT_COLOR, 3);
+                Core.putText(mRgba, "Eyes found.", new Point(400, mPreviewHeight-30), 3, 1, GOOD_NEWS_COLOUR, 2 );
+            }
+        	
+        	//--
+            //Core.rectangle(mRgba, facesArray[i].tl(), facesArray[i].br(), FACE_RECT_COLOR, 3);
+            Core.putText(mRgba, "Head found.", new Point(50, mPreviewHeight-30), 3, 1, GOOD_NEWS_COLOUR, 2 );
+            
+            return mRgba;
         }
         
-        if( facesArray.length > 0 )
-        {
-        	float[] objPosition = new float[4];
-
-        	objPosition = Shared.renderer().ScreenTo3D(mPreviewShiftFromLeft + facesArray[0].x + facesArray[0].width/2, 
-        			mPreviewShiftFromTop + facesArray[0].y + facesArray[0].height/3);
-            
-        	mGlassesPosition.x = objPosition[0]; 
-            mGlassesPosition.y = -objPosition[1];
-        }
+        // If eyes are not found then move glasses away
+        Core.putText(mRgba, "Head not found.", new Point(20, mPreviewHeight-30), 3, 1, BAD_NEWS_COLOUR, 2 );
+        Core.putText(mRgba, "Eyes not found.", new Point(350, mPreviewHeight-30), 3, 1, BAD_NEWS_COLOUR, 2 );
+        mGlassesPosition.x = 100;
+        mGlassesPosition.y = 100;
         
         return mRgba;
     }
@@ -201,26 +236,48 @@ public class Min3dActivity extends RendererActivity implements CvCameraViewListe
             switch (status) {
                 case LoaderCallbackInterface.SUCCESS:
                 {
+                	// load OpenCV cascade files from application resources
                     try {
-                        // load cascade file from application resources
-                        InputStream is = getResources().openRawResource(R.raw.lbpcascade_frontalface);
-                        File cascadeDir = getDir("cascade", Context.MODE_PRIVATE);
-                        mCascadeFile = new File(cascadeDir, "lbpcascade_frontalface.xml");
-                        FileOutputStream os = new FileOutputStream(mCascadeFile);
-
-                        byte[] buffer = new byte[4096];
-                        int bytesRead;
-                        while ((bytesRead = is.read(buffer)) != -1) {
-                            os.write(buffer, 0, bytesRead);
-                        }
-                        is.close();
-                        os.close();
-
-                        mJavaDetector = new CascadeClassifier(mCascadeFile.getAbsolutePath());
-                        if (mJavaDetector.empty()) {
-                            mJavaDetector = null;
-                        } 
-
+                    	File cascadeDir = getDir("cascade", Context.MODE_PRIVATE);
+                    	byte[] buffer = new byte[4096];
+                        
+                    	// face detector
+                    	{
+	                        InputStream is = getResources().openRawResource(R.raw.haarcascade_frontalface_default);
+	                        mCascadeFaceFile = new File(cascadeDir, "haarcascade_frontalface_default.xml");
+	                        FileOutputStream os = new FileOutputStream(mCascadeFaceFile);
+	                        	                        
+	                        int bytesRead;
+	                        while ((bytesRead = is.read(buffer)) != -1) {
+	                            os.write(buffer, 0, bytesRead);
+	                        }
+	                        is.close();
+	                        os.close();
+	
+	                        mFaceDetector = new CascadeClassifier(mCascadeFaceFile.getAbsolutePath());
+	                        if (mFaceDetector.empty()) {
+	                            mFaceDetector = null;
+	                        } 
+                    	}
+                    	
+                    	// eyes area detector
+                    	{
+	                        InputStream is = getResources().openRawResource(R.raw.haarcascade_mcs_eyepair_big);
+	                        mCascadeEyesFile = new File(cascadeDir, "haarcascade_mcs_eyepair_big.xml");
+	                        FileOutputStream os = new FileOutputStream(mCascadeEyesFile);
+	                        
+	                        int bytesRead;
+	                        while ((bytesRead = is.read(buffer)) != -1) {
+	                            os.write(buffer, 0, bytesRead);
+	                        }
+	                        is.close();
+	                        os.close();
+	
+	                        mEyesDetector = new CascadeClassifier(mCascadeEyesFile.getAbsolutePath());
+	                        if (mEyesDetector.empty()) {
+	                        	mEyesDetector = null;
+	                        } 
+                    	}
                         cascadeDir.delete();
 
                     } catch (IOException e) {

@@ -12,7 +12,8 @@ int layout main 0x7f030000
 int menu main 0x7f090000
 int raw glasses_mtl 0x7f040000
 int raw glasses_obj 0x7f040001
-int raw lbpcascade_frontalface 0x7f040002
+int raw haarcascade_frontalface_default 0x7f040002
+int raw haarcascade_mcs_eyepair_big 0x7f040003
 int string action_settings 0x7f070001
 int string app_name 0x7f070000
 int string hello_world 0x7f070002

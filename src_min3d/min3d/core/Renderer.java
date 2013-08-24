@@ -131,7 +131,7 @@ public class Renderer implements GLSurfaceView.Renderer
 		return _memoryInfo.availMem;
 	}
 	
-	public float[] ScreenTo3D( float x, float y )
+	public float[] ScreenTo3D( int x, int y )
 	{
 		float[] obj = new float[4];
 		int retval = GLU.gluUnProject( x, y, -_scene.camera().position.z, 
