@@ -12,8 +12,8 @@ int id fd_activity_surface_view 0x7f050003
 int id front 0x7f050002
 int layout main 0x7f030000
 int menu main 0x7f090000
-int raw haarcascade_frontalface_default 0x7f040000
-int raw haarcascade_mcs_eyepair_big 0x7f040001
+int raw haarcascade_eye_tree_eyeglasses 0x7f040000
+int raw lbpcascade_frontalface 0x7f040001
 int raw rayban_mtl 0x7f040002
 int raw rayban_obj 0x7f040003
 int string action_settings 0x7f070001
