@@ -41,17 +41,20 @@ public class Min3dActivity extends RendererActivity implements CvCameraViewListe
 	Point mPositionBetweenEyesOnPreview = new Point();
 	float mGlassesScaleFactor = 1;
 	float mGlassesAngle = 0;
+	float mGlassesRotationFactor = 0;
 	
 	private static final Scalar GOOD_NEWS_COLOUR = new Scalar(0, 255, 0, 255);
 	private static final Scalar BAD_NEWS_COLOUR = new Scalar(255, 255, 0, 255);
 	private Mat mRgba;
     private Mat mGray;
-    private float mRelativeFaceSize = 0.25f;
+    private float mRelativeFaceSize = 0.3f;
     private int   mAbsoluteFaceSize = 0;
     private CascadeClassifier mFaceDetector;
     private File mCascadeFaceFile;
     private CascadeClassifier mEyesDetector;
     private File mCascadeEyesFile;
+    private CascadeClassifier mNoseDetector;
+    private File mCascadeNoseFile;
     private CameraBridgeViewBase mOpenCvCameraView;
     private int mPreviewShiftFromLeft;
     private int mPreviewShiftFromTop;
@@ -67,11 +70,7 @@ public class Min3dActivity extends RendererActivity implements CvCameraViewListe
 		
 		// adding light sources to the scene
 		scene.lights().add(new Light());
-		scene.lights().add(new Light());
-		Light myLight = new Light();    
-		myLight.position.setZ(150); 
-		scene.lights().add(myLight);
-		
+				
 		// adding 3d glasses
 		IParser parser = Parser.createParser(Parser.Type.OBJ,
 				getResources(), "com.glasses_3d:raw/rayban_obj", true);
@@ -83,10 +82,9 @@ public class Min3dActivity extends RendererActivity implements CvCameraViewListe
 
 	@Override
 	public void updateScene() {
-		
-		super.updateScene();
-		
+
 		mObject3DGlasses.rotation().x = -7;
+		mObject3DGlasses.rotation().y = mGlassesRotationFactor;
 		mObject3DGlasses.rotation().z = mGlassesAngle;
 		mObject3DGlasses.position().x = mGlassesPosition.x;
 		float MESH_SHIFT_Y = 0.04f; // The center point of the specific mesh I'm using is not in the right place, so we have to move it 
@@ -161,6 +159,8 @@ public class Min3dActivity extends RendererActivity implements CvCameraViewListe
 	@Override
     public Mat onCameraFrame(CvCameraViewFrame inputFrame) {
 		
+		boolean fail = true;
+		
 		Core.flip( inputFrame.rgba(), mRgba, 1 );
 		Core.flip( inputFrame.gray(), mGray, 1 );
 		
@@ -182,11 +182,11 @@ public class Min3dActivity extends RendererActivity implements CvCameraViewListe
         Rect[] facesArray = faces.toArray();
         if( facesArray.length > 0 )
         {
-        	Rect r = facesArray[0];
+        	Rect faceRect = facesArray[0];
         	
         	// compute the eye area
-        	Rect eyeArea = new Rect(r.x + r.width / 8, (int) (r.y + (r.height / 4.5)), 
-        			r.width - 2 * r.width / 8, (int) (r.height / 3.0));
+        	Rect eyeArea = new Rect(faceRect.x + faceRect.width / 8, (int) (faceRect.y + (faceRect.height / 4.5)), 
+        			faceRect.width - 2 * faceRect.width / 8, (int) (faceRect.height / 3.0));
         	
         	Mat mFaceGray = mGray.submat(eyeArea);
         	
@@ -244,23 +244,50 @@ public class Min3dActivity extends RendererActivity implements CvCameraViewListe
             	mGlassesAngle = -(float)(Math.atan2((double)(rightEye.y - leftEye.y), (double)(rightEye.x - leftEye.x)) * 180.0 / 3.14);
 
             	//--
-            	float[] objPosition = new float[4];
+                // Nose detection
+                // computing the nose area
+            	Rect noseArea = new Rect(faceRect.x + faceRect.width / 4, (int) (faceRect.y + (faceRect.height / 2.5)), 
+            			faceRect.width - 2 * faceRect.width / 4, (int) (faceRect.height / 2.5));
+                Mat mNoseGray = mGray.submat(noseArea);
+            	
+            	// Searching for nose
+            	MatOfRect nose = new MatOfRect();
+            	if (mNoseDetector != null)
+                {
+            		mNoseDetector.detectMultiScale(mNoseGray, nose, 1.1, 2, 2, 
+                    		new Size(noseArea.height/3, noseArea.height/3), new Size());
+                }
+            	
+                Rect[] noseArray = nose.toArray();
+                if( noseArray.length == 1 )
+                {
+                	float[] objPosition = new float[4];
 
-            	// Converting screen coordinates to 3D
-            	objPosition = Shared.renderer().ScreenTo3D(mPreviewShiftFromLeft + (int)mPositionBetweenEyesOnPreview.x, 
-            			mPreviewShiftFromTop + (int)mPositionBetweenEyesOnPreview.y);
-                
-            	mGlassesPosition.x = objPosition[0]; 
-                mGlassesPosition.y = -objPosition[1];
-                
-                //--
+                	// Converting screen coordinates to 3D
+                	objPosition = Shared.renderer().ScreenTo3D(mPreviewShiftFromLeft + (int)mPositionBetweenEyesOnPreview.x, 
+                			mPreviewShiftFromTop + (int)mPositionBetweenEyesOnPreview.y);
+                    
+                	mGlassesPosition.x = objPosition[0]; 
+                    mGlassesPosition.y = -objPosition[1];
+                    
+                    // Find out head rotation by relative nose position 
+                    mGlassesRotationFactor = (noseArea.width / 2) - (noseArray[0].x + noseArray[0].width/2);
+                    
+                    // glasses should be drawn
+                    fail = false;
+                    
+                	Core.putText(mRgba, "Nose found.", new Point(400, mPreviewHeight-60), 3, 1, GOOD_NEWS_COLOUR, 2 );
+                }
+                else
+                {
+                	Core.putText(mRgba, "Nose not found.", new Point(350, mPreviewHeight-60), 3, 1, BAD_NEWS_COLOUR, 2 );
+                }
+
                 Core.putText(mRgba, "Eyes found.", new Point(400, mPreviewHeight-30), 3, 1, GOOD_NEWS_COLOUR, 2 );
             }
             else
             {
             	Core.putText(mRgba, "Eyes not found.", new Point(350, mPreviewHeight-30), 3, 1, BAD_NEWS_COLOUR, 2 );
-            	mGlassesPosition.x = 100;
-                mGlassesPosition.y = 100;
             }
             
             Core.putText(mRgba, "Head found.", new Point(50, mPreviewHeight-30), 3, 1, GOOD_NEWS_COLOUR, 2 );
@@ -268,6 +295,13 @@ public class Min3dActivity extends RendererActivity implements CvCameraViewListe
         else
         {
         	Core.putText(mRgba, "Head not found.", new Point(20, mPreviewHeight-30), 3, 1, BAD_NEWS_COLOUR, 2 );
+        }
+        
+        if( fail )
+        {
+        	// If face, eyes and nose are not found then move glasses away 
+        	mGlassesPosition.x = 100;
+            mGlassesPosition.y = 100;
         }
         
         return mRgba;
@@ -305,8 +339,8 @@ public class Min3dActivity extends RendererActivity implements CvCameraViewListe
                     	
                     	// eyes detector
                     	{
-	                        InputStream is = getResources().openRawResource(R.raw.haarcascade_eye_tree_eyeglasses);
-	                        mCascadeEyesFile = new File(cascadeDir, "haarcascade_eye_tree_eyeglasses.xml");
+	                        InputStream is = getResources().openRawResource(R.raw.haarcascade_eye);
+	                        mCascadeEyesFile = new File(cascadeDir, "haarcascade_eye.xml");
 	                        FileOutputStream os = new FileOutputStream(mCascadeEyesFile);
 	                        
 	                        int bytesRead;
@@ -319,6 +353,25 @@ public class Min3dActivity extends RendererActivity implements CvCameraViewListe
 	                        mEyesDetector = new CascadeClassifier(mCascadeEyesFile.getAbsolutePath());
 	                        if (mEyesDetector.empty()) {
 	                        	mEyesDetector = null;
+	                        } 
+                    	}
+                    	
+                    	// nose detector
+                    	{
+	                        InputStream is = getResources().openRawResource(R.raw.haarcascade_mcs_nose);
+	                        mCascadeNoseFile = new File(cascadeDir, "haarcascade_mcs_nose.xml");
+	                        FileOutputStream os = new FileOutputStream(mCascadeNoseFile);
+	                        
+	                        int bytesRead;
+	                        while ((bytesRead = is.read(buffer)) != -1) {
+	                            os.write(buffer, 0, bytesRead);
+	                        }
+	                        is.close();
+	                        os.close();
+	
+	                        mNoseDetector = new CascadeClassifier(mCascadeNoseFile.getAbsolutePath());
+	                        if (mNoseDetector.empty()) {
+	                        	mNoseDetector = null;
 	                        } 
                     	}
                     	
